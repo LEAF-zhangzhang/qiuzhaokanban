@@ -8,11 +8,16 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Firebase SDK (for real-time collaboration) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <style>
     @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
     .fade-in { animation: fadeIn 0.3s ease-out; }
     @keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
     .scale-in { animation: scaleIn 0.25s ease-out; }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+    .pulse { animation: pulse 2s ease-in-out infinite; }
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
@@ -22,7 +27,7 @@
 <body class="bg-gray-50">
   <div id="root"></div>
   <script type="text/babel">
-    const { useState, useMemo, useEffect, useCallback } = React;
+    const { useState, useMemo, useEffect, useCallback, useRef } = React;
 
     /* ═══════ SVG Icons ═══════ */
     const ICON_PATHS = {
@@ -43,6 +48,20 @@
       clock:      <><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>,
       star:       <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>,
       coffee:     <><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></>,
+      file:       <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></>,
+      upload:     <><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></>,
+      download:   <><polyline points="8 17 12 21 16 17"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></>,
+      share:      <><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></>,
+      note:       <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></>,
+      link:       <><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></>,
+      copy:       <><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></>,
+      wifi:       <><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></>,
+      wifiOff:    <><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.56 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></>,
+      thumbsUp:   <><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></>,
+      thumbsDown: <><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></>,
+      chevronDown:<polyline points="6 9 12 15 18 9"/>,
+      chevronUp:  <polyline points="18 15 12 9 6 15"/>,
+      eye:        <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>,
     };
     function Icon({ name, size = 24, className = "", style = {} }) {
       return (
@@ -71,7 +90,7 @@
       { key: "deadline",  label: "截止", color: "#ef4444" },
       { key: "other",     label: "其他", color: "#94a3b8" },
     ];
-    const STORAGE_KEY = "qiuzhao-dashboard-v2";
+    const STORAGE_KEY = "qiuzhao-dashboard-v3";
     const WEEKDAYS = ["一", "二", "三", "四", "五", "六", "日"];
 
     const SEED_APPS = [
@@ -89,10 +108,95 @@
       { id: 103, appId: 6, date: "2026-08-25", type: "deadline",  company: "蚂蚁集团", notes: "Offer 答复截止" },
       { id: 104, appId: 4, date: "2026-08-18", type: "other",     company: "美团", notes: "等待简历筛选结果" },
     ];
+    const SEED_NOTES = [
+      { id: 201, appId: 5, company: "快手", stage: "一面", date: "2026-08-02", rating: 2, summary: "分布式问太多，准备不足",
+        entries: [
+          { question: "介绍一致性哈希算法", answer: "答了虚拟节点但没讲清楚扩容细节", good: false },
+          { question: "CAP 理论及实际取舍", answer: "基本概念答对了，举例不够深入", good: false },
+        ]},
+      { id: 202, appId: 1, company: "字节跳动", stage: "一面", date: "2026-08-10", rating: 4, summary: "算法面，手撕树DP",
+        entries: [
+          { question: "手撕：二叉树最大路径和（树DP）", answer: "用后序遍历+全局变量解出，复杂度O(n)", good: true },
+          { question: "HashMap 底层原理", answer: "讲了数组+链表+红黑树，扩容机制也答了", good: true },
+        ]},
+    ];
+
+    /* ═══════ Firebase Collaboration ═══════ */
+    let firebaseDB = null;
+    let currentRoom = null;
+    let _remoteUpdate = false;
+    let _saveTimer = null;
+
+    const FIREBASE_CONFIG = {
+      // 填入你的 Firebase 配置以开启实时多人协作
+      apiKey: "",
+      authDomain: "",
+      databaseURL: "",
+      projectId: "",
+    };
+
+    function initFirebase() {
+      if (FIREBASE_CONFIG.databaseURL && typeof firebase !== "undefined") {
+        try {
+          const app = firebase.initializeApp(FIREBASE_CONFIG);
+          firebaseDB = firebase.database();
+          console.log("[Firebase] Initialized successfully");
+          return true;
+        } catch (e) { console.warn("[Firebase] Init failed:", e); }
+      }
+      return false;
+    }
+
+    function genRoom() { return Math.random().toString(36).substring(2, 8).toUpperCase(); }
+
+    function createRoom() {
+      if (!firebaseDB) return null;
+      const room = genRoom();
+      joinRoom(room);
+      return room;
+    }
+
+    function joinRoom(room) {
+      if (!firebaseDB) return;
+      currentRoom = room;
+      try { localStorage.setItem("qiuzhao-room", room); } catch {}
+      // Update URL hash
+      window.location.hash = "room=" + room;
+      console.log("[Firebase] Joined room:", room);
+    }
+
+    function setupSync(setApps, setEvents, setNotes) {
+      if (!firebaseDB || !currentRoom) return;
+      const ref = firebaseDB.ref("rooms/" + currentRoom);
+
+      ref.on("value", snap => {
+        if (_remoteUpdate) { _remoteUpdate = false; return; }
+        const data = snap.val();
+        if (!data) return;
+        _remoteUpdate = true;
+        if (data.apps) setApps(data.apps);
+        if (data.events) setEvents(data.events);
+        if (data.notes) setNotes(data.notes);
+        setTimeout(() => { _remoteUpdate = false; }, 100);
+      });
+    }
+
+    function pushToFirebase(apps, events, notes) {
+      if (!firebaseDB || !currentRoom || _remoteUpdate) return;
+      clearTimeout(_saveTimer);
+      _saveTimer = setTimeout(() => {
+        try {
+          firebaseDB.ref("rooms/" + currentRoom).update({
+            apps, events, notes,
+            updatedAt: firebase.database.ServerValue.TIMESTAMP,
+          });
+        } catch (e) { console.warn("[Firebase] Push failed:", e); }
+      }, 500);
+    }
 
     /* ═══════ localStorage ═══════ */
     function loadState() { try { const r = localStorage.getItem(STORAGE_KEY); return r ? JSON.parse(r) : null; } catch { return null; } }
-    function saveState(apps, events) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ apps, events })); } catch {} }
+    function saveState(apps, events, resumes, notes) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ apps, events, resumes, notes })); } catch {} }
 
     /* ═══════ Custom Charts (SVG) ═══════ */
     function BarChartCustom({ data }) {
@@ -203,7 +307,7 @@
       );
     }
 
-    function AppRow({ app, onDelete, onEdit }) {
+    function AppRow({ app, onDelete, onEdit, onNotes }) {
       const st = STATUS_MAP[app.status];
       return (
         <div className="group bg-white rounded-xl px-4 py-3.5 border border-gray-100 hover:shadow-md hover:border-gray-200 transition-all duration-200 flex items-center gap-4">
@@ -220,6 +324,7 @@
             </div>
           </div>
           <span className="px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap ring-1" style={{ backgroundColor: st.bg, color: st.text, boxShadow: `0 0 0 1px ${st.color}22` }}>{st.label}</span>
+          {onNotes && <button onClick={() => onNotes(app)} className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-300 hover:text-blue-500 p-1" title="面试复盘"><Icon name="note" size={14} /></button>}
           <button onClick={() => onEdit(app)} className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-300 hover:text-indigo-500 p-1"><Icon name="edit" size={14} /></button>
           <button onClick={() => onDelete(app.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-300 hover:text-red-400 p-1"><Icon name="trash" size={14} /></button>
         </div>
@@ -284,7 +389,7 @@
     }
 
     /* ─── Calendar ─── */
-    function CalendarView({ events, onAddEvent, onDeleteEvent }) {
+    function CalendarView({ events, onAddEvent, onDeleteEvent, onEditEvent }) {
       const today = new Date();
       const [year, setYear] = useState(today.getFullYear());
       const [month, setMonth] = useState(today.getMonth());
@@ -327,7 +432,7 @@
                           return (
                             <div key={e.id} className="flex items-center gap-1 group/ev">
                               <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{backgroundColor:et.color}} />
-                              <span className="text-xs text-gray-600 truncate flex-1" title={`${e.company} - ${e.notes}`}>{e.company}</span>
+                              <span className="text-xs text-gray-600 truncate flex-1 cursor-pointer hover:text-indigo-600" title={`${e.company} - ${e.notes}`} onClick={()=>onEditEvent && onEditEvent(e)}>{e.company}</span>
                               <button onClick={()=>onDeleteEvent(e.id)} className="opacity-0 group-hover/ev:opacity-100 text-gray-300 hover:text-red-400"><Icon name="trash" size={10} /></button>
                             </div>
                           );
@@ -357,12 +462,246 @@
                         <span className="px-2 py-0.5 rounded text-white text-xs font-medium flex-shrink-0" style={{backgroundColor:et.color}}>{et.label}</span>
                         <span className="text-sm font-medium text-gray-700">{e.company}</span>
                         <span className="text-xs text-gray-400 flex-1 truncate">{e.notes}</span>
+                        <button onClick={()=>onEditEvent && onEditEvent(e)} className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-300 hover:text-blue-500"><Icon name="edit" size={13} /></button>
                         <button onClick={()=>onDeleteEvent(e.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-300 hover:text-red-400"><Icon name="trash" size={13} /></button>
                       </div>
                     );
                   })}</div>;
             })()}
           </div>
+        </div>
+      );
+    }
+
+    /* ─── Resume Management ─── */
+    function ResumeTab({ resumes, onUpload, onDeleteResume }) {
+      const fileRef = useRef(null);
+      const [verLabel, setVerLabel] = useState("");
+      const [verNotes, setVerNotes] = useState("");
+
+      const handleFile = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 5 * 1024 * 1024) { alert("文件不能超过 5MB"); return; }
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          onUpload({
+            id: Date.now(),
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            version: verLabel || `v${resumes.length + 1}`,
+            notes: verNotes,
+            uploadDate: new Date().toISOString().slice(0, 10),
+            dataUrl: ev.target.result,
+          });
+          setVerLabel("");
+          setVerNotes("");
+        };
+        reader.readAsDataURL(file);
+        if (fileRef.current) fileRef.current.value = "";
+      };
+
+      const fmtSize = (b) => b < 1024 ? b + " B" : b < 1048576 ? (b/1024).toFixed(1) + " KB" : (b/1048576).toFixed(1) + " MB";
+
+      return (
+        <div className="space-y-6 fade-in">
+          {/* Upload Area */}
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+              <Icon name="upload" size={16} style={{color:"#6366f1"}} /> 上传新版简历
+            </h3>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <input type="text" value={verLabel} onChange={e=>setVerLabel(e.target.value)} placeholder="版本标记 (如 v3, 终稿)" className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+              <input type="text" value={verNotes} onChange={e=>setVerNotes(e.target.value)} placeholder="改动说明 (如: 增加了实习经历)" className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200" />
+              <label className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-indigo-500 text-white text-sm font-medium hover:bg-indigo-600 transition cursor-pointer shadow-lg shadow-indigo-200 whitespace-nowrap">
+                <Icon name="upload" size={15} /> 选择文件
+                <input ref={fileRef} type="file" accept=".pdf,.doc,.docx" onChange={handleFile} className="hidden" />
+              </label>
+            </div>
+            <p className="text-xs text-gray-400 mt-2">支持 PDF、DOC、DOCX，最大 5MB</p>
+          </div>
+
+          {/* Version History */}
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+              <Icon name="file" size={16} style={{color:"#10b981"}} /> 版本历史 ({resumes.length})
+            </h3>
+            {resumes.length === 0 ? (
+              <div className="text-center py-8">
+                <Icon name="file" size={36} className="mx-auto text-gray-200 mb-2" />
+                <p className="text-sm text-gray-400">还没有简历，上传你的第一份吧</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {resumes.map((r, idx) => (
+                  <div key={r.id} className="flex items-center gap-4 p-3 rounded-xl border border-gray-100 hover:border-indigo-200 hover:bg-indigo-50/30 transition group">
+                    <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{backgroundColor: idx===0 ? "#6366f118" : "#f3f4f6"}}>
+                      <Icon name="file" size={18} style={{color: idx===0 ? "#6366f1" : "#9ca3af"}} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="font-semibold text-sm text-gray-800">{r.name}</span>
+                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold" style={{backgroundColor: idx===0 ? "#6366f1" : "#e5e7eb", color: idx===0 ? "white" : "#6b7280"}}>{r.version}</span>
+                        {idx === 0 && <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">最新</span>}
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-gray-400">
+                        <span>{r.uploadDate}</span>
+                        <span>{fmtSize(r.size)}</span>
+                        {r.notes && <span className="text-indigo-500">{r.notes}</span>}
+                      </div>
+                    </div>
+                    <a href={r.dataUrl} download={r.name} className="opacity-0 group-hover:opacity-100 transition-opacity p-2 rounded-lg hover:bg-indigo-100 text-indigo-500" title="下载"><Icon name="download" size={15} /></a>
+                    <button onClick={() => onDeleteResume(r.id)} className="opacity-0 group-hover:opacity-100 transition-opacity p-2 rounded-lg hover:bg-red-100 text-red-400" title="删除"><Icon name="trash" size={15} /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    /* ─── Interview Notes ─── */
+    function InterviewNotesView({ notes, apps, onSaveNote, onDeleteNote }) {
+      const [expandedId, setExpandedId] = useState(null);
+      const [editNote, setEditNote] = useState(null);
+
+      const sortedNotes = useMemo(() => [...notes].sort((a,b) => (b.date||"").localeCompare(a.date||"")), [notes]);
+      const ratingLabel = r => ["","很差","一般","还行","不错","很好"][r] || "";
+      const ratingColor = r => ["","#ef4444","#f59e0b","#3b82f6","#10b981","#10b981"][r] || "#94a3b8";
+
+      return (
+        <div className="space-y-4 fade-in">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <Icon name="note" size={16} style={{color:"#8b5cf6"}} /> 面试复盘记录 ({notes.length})
+            </h3>
+            <button onClick={() => setEditNote("new")} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-500 text-white text-xs font-medium hover:bg-indigo-600 transition">
+              <Icon name="plus" size={13} /> 添加复盘
+            </button>
+          </div>
+
+          {sortedNotes.length === 0 ? (
+            <div className="bg-white rounded-2xl p-10 shadow-sm border border-gray-100 text-center">
+              <Icon name="note" size={40} className="mx-auto text-gray-200 mb-3" />
+              <p className="text-sm text-gray-400">还没有面试复盘记录</p>
+              <p className="text-xs text-gray-300 mt-1">面试后记录被问到的问题和表现，方便复盘</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {sortedNotes.map(n => {
+                const isExpanded = expandedId === n.id;
+                const app = apps.find(a => a.id === n.appId);
+                return (
+                  <div key={n.id} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition" onClick={() => setExpandedId(isExpanded ? null : n.id)}>
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{backgroundColor: ratingColor(n.rating) + "18"}}>
+                        <span className="text-sm font-bold" style={{color: ratingColor(n.rating)}}>{n.rating}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-sm text-gray-800">{n.company}</span>
+                          {app && <span className="text-xs text-gray-400">{app.department}</span>}
+                          <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{backgroundColor: STAGE_COLORS[n.stage] + "18", color: STAGE_COLORS[n.stage]}}>{n.stage}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
+                          <span>{n.date}</span>
+                          <span>{"\u00b7"}</span>
+                          <span style={{color: ratingColor(n.rating)}}>{ratingLabel(n.rating)}</span>
+                          {n.summary && <><span>{"\u00b7"}</span><span className="truncate">{n.summary}</span></>}
+                        </div>
+                      </div>
+                      <span className="text-xs text-gray-400">{n.entries?.length || 0} 题</span>
+                      <Icon name={isExpanded ? "chevronUp" : "chevronDown"} size={16} className="text-gray-400" />
+                    </div>
+                    {isExpanded && (
+                      <div className="px-4 pb-4 border-t border-gray-50">
+                        {n.summary && <p className="text-xs text-gray-500 mt-3 mb-3 italic">{n.summary}</p>}
+                        {n.entries?.length > 0 ? (
+                          <div className="space-y-2">
+                            {n.entries.map((entry, idx) => (
+                              <div key={idx} className="p-3 rounded-lg bg-gray-50">
+                                <div className="flex items-start gap-2 mb-1.5">
+                                  <span className="text-xs font-semibold text-gray-500 mt-0.5">Q{idx+1}</span>
+                                  <span className="text-sm text-gray-800 font-medium">{entry.question}</span>
+                                  <Icon name={entry.good ? "thumbsUp" : "thumbsDown"} size={13} style={{color: entry.good ? "#10b981" : "#ef4444", marginTop: 2}} className="flex-shrink-0 ml-auto" />
+                                </div>
+                                {entry.answer && <p className="text-xs text-gray-500 pl-7">{entry.answer}</p>}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-gray-300 py-2">暂无具体题目记录</p>
+                        )}
+                        <div className="flex gap-2 mt-3">
+                          <button onClick={(e) => { e.stopPropagation(); setEditNote(n); }} className="text-xs text-indigo-500 hover:text-indigo-700 flex items-center gap-1"><Icon name="edit" size={12} /> 编辑</button>
+                          <button onClick={(e) => { e.stopPropagation(); onDeleteNote(n.id); }} className="text-xs text-red-400 hover:text-red-600 flex items-center gap-1"><Icon name="trash" size={12} /> 删除</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {editNote && <NoteModal initial={editNote==="new"?null:editNote} apps={apps} onSave={n => { onSaveNote(n); setEditNote(null); }} onClose={() => setEditNote(null)} />}
+        </div>
+      );
+    }
+
+    /* ─── Collaboration Status ─── */
+    function CollabBar({ firebaseReady, room, onCreateRoom, onJoinRoom }) {
+      const [input, setInput] = useState("");
+      const [showInput, setShowInput] = useState(false);
+      const [copied, setCopied] = useState(false);
+
+      const shareUrl = room ? `${window.location.origin}${window.location.pathname}#room=${room}` : "";
+      const copyLink = () => {
+        if (!shareUrl) return;
+        navigator.clipboard.writeText(shareUrl).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+      };
+
+      if (!firebaseReady) {
+        return (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-3 text-sm">
+            <Icon name="wifiOff" size={16} style={{color:"#f59e0b"}} />
+            <span className="text-amber-700 text-xs">多人协作未配置。在 HTML 文件顶部的 <code className="bg-amber-100 px-1 rounded">FIREBASE_CONFIG</code> 中填入 Firebase 配置即可开启实时同步。</span>
+          </div>
+        );
+      }
+
+      if (!room) {
+        return (
+          <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap">
+            <Icon name="share" size={16} style={{color:"#6366f1"}} />
+            <span className="text-xs text-indigo-700 font-medium">开启多人协作</span>
+            <button onClick={onCreateRoom} className="px-3 py-1 rounded-lg bg-indigo-500 text-white text-xs font-medium hover:bg-indigo-600 transition">创建房间</button>
+            {!showInput ? (
+              <button onClick={() => setShowInput(true)} className="px-3 py-1 rounded-lg bg-white border border-indigo-200 text-indigo-600 text-xs font-medium hover:bg-indigo-50 transition">加入房间</button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <input value={input} onChange={e=>setInput(e.target.value.toUpperCase())} placeholder="输入房间码" className="w-24 rounded-lg border border-indigo-200 px-2 py-1 text-xs text-center font-mono tracking-wider focus:outline-none focus:ring-2 focus:ring-indigo-200" maxLength={6} />
+                <button onClick={() => { if(input.length >= 4) { onJoinRoom(input); setShowInput(false); setInput(""); } }} className="px-3 py-1 rounded-lg bg-indigo-500 text-white text-xs font-medium hover:bg-indigo-600 transition">加入</button>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      return (
+        <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full bg-green-500 pulse" />
+            <span className="text-xs text-green-700 font-medium">已连接</span>
+          </div>
+          <span className="text-xs text-gray-500">房间码</span>
+          <span className="font-mono font-bold text-sm text-indigo-600 tracking-wider bg-indigo-50 px-2 py-0.5 rounded">{room}</span>
+          <button onClick={copyLink} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-green-200 text-xs text-green-700 hover:bg-green-100 transition font-medium">
+            <Icon name={copied ? "copy" : "link"} size={12} /> {copied ? "已复制" : "分享链接"}
+          </button>
+          <button onClick={() => { window.location.hash = ""; currentRoom = null; try{localStorage.removeItem("qiuzhao-room")}catch{} window.location.reload(); }} className="text-xs text-gray-400 hover:text-red-500 transition ml-auto">断开</button>
         </div>
       );
     }
@@ -419,12 +758,13 @@
       );
     }
 
-    function EventModal({ onSave, onClose }) {
-      const [form, setForm] = useState({ date: new Date().toISOString().slice(0,10), type: "interview", company: "", notes: "" });
+    function EventModal({ initial, onSave, onClose }) {
+      const [form, setForm] = useState({ date: new Date().toISOString().slice(0,10), type: "interview", company: "", notes: "", ...initial });
       const set = k => e => setForm({ ...form, [k]: e.target.value });
+      const isEdit = !!initial?.id;
       const inputCls = "w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 transition";
       return (
-        <Modal title="添加日历事件" onClose={onClose}>
+        <Modal title={isEdit ? "编辑事件" : "添加日历事件"} onClose={onClose}>
           <div className="space-y-3">
             <div><label className="text-xs font-medium text-gray-500 mb-1 block">公司 <span className="text-red-400">*</span></label><input value={form.company} onChange={set("company")} placeholder="如：字节跳动" className={inputCls} /></div>
             <div className="flex gap-3">
@@ -435,7 +775,83 @@
           </div>
           <div className="flex gap-3 mt-6">
             <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">取消</button>
-            <button onClick={() => { if (form.company.trim() && form.date) onSave(form); }} className="flex-1 py-2.5 rounded-xl bg-indigo-500 text-white text-sm font-medium hover:bg-indigo-600 transition shadow-lg shadow-indigo-200">添加</button>
+            <button onClick={() => { if (form.company.trim() && form.date) onSave(form); }} className="flex-1 py-2.5 rounded-xl bg-indigo-500 text-white text-sm font-medium hover:bg-indigo-600 transition shadow-lg shadow-indigo-200">{isEdit ? "保存" : "添加"}</button>
+          </div>
+        </Modal>
+      );
+    }
+
+    function NoteModal({ initial, apps, onSave, onClose }) {
+      const empty = { appId: apps[0]?.id || "", company: "", stage: "一面", date: new Date().toISOString().slice(0,10), rating: 3, summary: "", entries: [] };
+      const [form, setForm] = useState({ ...empty, ...initial });
+      const set = k => e => setForm({ ...form, [k]: e.target.value });
+      const inputCls = "w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 transition";
+      const isEdit = !!initial?.id;
+
+      const addEntry = () => setForm({ ...form, entries: [...form.entries, { question: "", answer: "", good: true }] });
+      const updateEntry = (idx, field, val) => { const es = [...form.entries]; es[idx] = { ...es[idx], [field]: val }; setForm({ ...form, entries: es }); };
+      const removeEntry = idx => setForm({ ...form, entries: form.entries.filter((_,i) => i !== idx) });
+
+      const handleSave = () => {
+        if (!form.company.trim()) return;
+        const matchedApp = apps.find(a => a.company === form.company);
+        onSave({ ...form, id: form.id || Date.now(), appId: matchedApp?.id || form.appId });
+      };
+
+      return (
+        <Modal title={isEdit ? "编辑面试复盘" : "添加面试复盘"} onClose={onClose}>
+          <div className="space-y-3">
+            <div className="flex gap-3">
+              <div className="flex-1"><label className="text-xs font-medium text-gray-500 mb-1 block">公司 <span className="text-red-400">*</span></label>
+                <select value={form.company} onChange={e => { const app = apps.find(a=>a.id===+e.target.value); setForm({...form, company: app?.company || e.target.value, appId: app?.id || ""}); }} className={inputCls}>
+                  <option value="">选择公司</option>
+                  {apps.map(a => <option key={a.id} value={a.id}>{a.company}</option>)}
+                </select>
+              </div>
+              <div className="flex-1"><label className="text-xs font-medium text-gray-500 mb-1 block">阶段</label>
+                <select value={form.stage} onChange={set("stage")} className={inputCls}>{STAGES.filter(s=>s!=="简历投递").map(s=><option key={s} value={s}>{s}</option>)}</select>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <div className="flex-1"><label className="text-xs font-medium text-gray-500 mb-1 block">日期</label><input type="date" value={form.date} onChange={set("date")} className={inputCls} /></div>
+              <div className="flex-1"><label className="text-xs font-medium text-gray-500 mb-1 block">整体评分</label>
+                <div className="flex gap-1 mt-1">
+                  {[1,2,3,4,5].map(r => (
+                    <button key={r} onClick={() => set("rating")({target:{value:r}})} className={`w-8 h-8 rounded-lg text-sm font-bold transition ${form.rating >= r ? "text-white" : "bg-gray-100 text-gray-400"}`} style={form.rating >= r ? {backgroundColor: ["","#ef4444","#f59e0b","#3b82f6","#10b981","#10b981"][r]} : {}}>{r}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div><label className="text-xs font-medium text-gray-500 mb-1 block">总结</label><textarea value={form.summary} onChange={set("summary")} placeholder="整体感受、亮点和不足..." rows={2} className={`${inputCls} resize-none`} /></div>
+
+            <div className="border-t border-gray-100 pt-3">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-semibold text-gray-500">面试题目 ({form.entries.length})</label>
+                <button onClick={addEntry} className="text-xs text-indigo-500 hover:text-indigo-700 flex items-center gap-1"><Icon name="plus" size={12} /> 添加题目</button>
+              </div>
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {form.entries.map((entry, idx) => (
+                  <div key={idx} className="p-3 rounded-lg bg-gray-50 space-y-2">
+                    <div className="flex items-start gap-2">
+                      <span className="text-xs font-semibold text-gray-400 mt-2 flex-shrink-0">Q{idx+1}</span>
+                      <input value={entry.question} onChange={e => updateEntry(idx, "question", e.target.value)} placeholder="被问到的问题" className={inputCls} />
+                      <button onClick={() => removeEntry(idx)} className="text-gray-300 hover:text-red-400 mt-2 flex-shrink-0"><Icon name="trash" size={13} /></button>
+                    </div>
+                    <div className="pl-8">
+                      <input value={entry.answer} onChange={e => updateEntry(idx, "answer", e.target.value)} placeholder="你的回答要点" className={inputCls} />
+                      <div className="flex gap-2 mt-1">
+                        <button onClick={() => updateEntry(idx, "good", true)} className={`text-xs px-2 py-0.5 rounded transition ${entry.good ? "bg-green-100 text-green-700" : "text-gray-400"}`}>答得好</button>
+                        <button onClick={() => updateEntry(idx, "good", false)} className={`text-xs px-2 py-0.5 rounded transition ${!entry.good ? "bg-red-100 text-red-700" : "text-gray-400"}`}>需改进</button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-3 mt-6">
+            <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-500 hover:bg-gray-50 transition">取消</button>
+            <button onClick={handleSave} className="flex-1 py-2.5 rounded-xl bg-indigo-500 text-white text-sm font-medium hover:bg-indigo-600 transition shadow-lg shadow-indigo-200">{isEdit ? "保存" : "添加"}</button>
           </div>
         </Modal>
       );
@@ -446,12 +862,40 @@
       const saved = useMemo(() => loadState(), []);
       const [apps, setApps] = useState(saved?.apps || SEED_APPS);
       const [events, setEvents] = useState(saved?.events || SEED_EVENTS);
+      const [resumes, setResumes] = useState(saved?.resumes || []);
+      const [notes, setNotes] = useState(saved?.notes || SEED_NOTES);
       const [tab, setTab] = useState("dashboard");
       const [filter, setFilter] = useState("all");
       const [appModal, setAppModal] = useState(null);
-      const [eventModal, setEventModal] = useState(false);
+      const [eventModal, setEventModal] = useState(null);
+      const [noteModal, setNoteModal] = useState(null);
 
-      useEffect(() => { saveState(apps, events); }, [apps, events]);
+      // Firebase init
+      const [firebaseReady, setFirebaseReady] = useState(false);
+      const [room, setRoom] = useState(null);
+
+      useEffect(() => {
+        const ready = initFirebase();
+        setFirebaseReady(ready);
+        if (ready) {
+          // Check URL hash or localStorage for room
+          const hashRoom = window.location.hash.match(/room=([A-Z0-9]+)/i)?.[1]?.toUpperCase();
+          const savedRoom = hashRoom || (() => { try { return localStorage.getItem("qiuzhao-room"); } catch { return null; } })();
+          if (savedRoom) {
+            joinRoom(savedRoom);
+            setRoom(savedRoom);
+            setupSync(setApps, setEvents, setNotes);
+          }
+        }
+      }, []);
+
+      // Auto-save to localStorage
+      useEffect(() => { saveState(apps, events, resumes, notes); }, [apps, events, resumes, notes]);
+
+      // Push to Firebase when state changes
+      useEffect(() => {
+        if (firebaseReady && room) pushToFirebase(apps, events, notes);
+      }, [apps, events, notes]);
 
       const stats = useMemo(() => {
         const t = apps.length, o = apps.filter(a=>a.status==="offer").length, iv = apps.filter(a=>a.status==="interviewing").length;
@@ -466,9 +910,23 @@
         else setApps(prev => [...prev, { ...form, id: Date.now() }]);
         setAppModal(null);
       };
-      const deleteApp = id => { setApps(prev => prev.filter(a=>a.id!==id)); setEvents(prev => prev.filter(e=>e.appId!==id)); };
-      const addEvent = form => { setEvents(prev => [...prev, { ...form, id: Date.now() }]); setEventModal(false); };
+      const deleteApp = id => { setApps(prev => prev.filter(a=>a.id!==id)); setEvents(prev => prev.filter(e=>e.appId!==id)); setNotes(prev => prev.filter(n=>n.appId!==id)); };
+      const saveEvent = form => {
+        if (form.id) setEvents(prev => prev.map(e => e.id===form.id ? form : e));
+        else setEvents(prev => [...prev, { ...form, id: Date.now() }]);
+        setEventModal(null);
+      };
       const deleteEvent = id => setEvents(prev => prev.filter(e=>e.id!==id));
+      const uploadResume = r => setResumes(prev => [r, ...prev]);
+      const deleteResume = id => setResumes(prev => prev.filter(r=>r.id!==id));
+      const saveNote = n => {
+        if (n.id && notes.find(x => x.id === n.id)) setNotes(prev => prev.map(x => x.id===n.id ? n : x));
+        else setNotes(prev => [...prev, n]);
+      };
+      const deleteNote = id => setNotes(prev => prev.filter(n=>n.id!==id));
+
+      const handleCreateRoom = () => { const r = createRoom(); if (r) { setRoom(r); setupSync(setApps, setEvents, setNotes); } };
+      const handleJoinRoom = (r) => { joinRoom(r); setRoom(r); setupSync(setApps, setEvents, setNotes); };
 
       const funnelData = useMemo(() => {
         const active = apps.filter(a=>a.status!=="withdrawn");
@@ -485,6 +943,8 @@
         { key:"list",      label:"列表", icon:"briefcase" },
         { key:"offers",    label:"Offer", icon:"dollar" },
         { key:"calendar",  label:"日历", icon:"calendar" },
+        { key:"resume",    label:"简历", icon:"file" },
+        { key:"notes",     label:"复盘", icon:"note" },
       ];
 
       return (
@@ -504,11 +964,16 @@
           </div>
 
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+            {/* Collab Bar */}
+            <div className="mb-4">
+              <CollabBar firebaseReady={firebaseReady} room={room} onCreateRoom={handleCreateRoom} onJoinRoom={handleJoinRoom} />
+            </div>
+
             {/* tabs */}
             <div className="flex gap-1 bg-gray-100/80 rounded-xl p-1 mb-6 w-fit overflow-x-auto">
               {tabs.map(({key,label,icon}) => (
-                <button key={key} onClick={()=>setTab(key)} className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap ${tab===key ? "bg-white text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
-                  <Icon name={icon} size={15} /> {label}
+                <button key={key} onClick={()=>setTab(key)} className={`flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap ${tab===key ? "bg-white text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
+                  <Icon name={icon} size={15} /> <span className="hidden sm:inline">{label}</span>
                 </button>
               ))}
             </div>
@@ -566,7 +1031,7 @@
                   ))}
                   <span className="ml-auto text-xs text-gray-400">{filtered.length} 条记录</span>
                 </div>
-                <div className="space-y-2">{filtered.map(a=><AppRow key={a.id} app={a} onDelete={deleteApp} onEdit={setAppModal} />)}</div>
+                <div className="space-y-2">{filtered.map(a=><AppRow key={a.id} app={a} onDelete={deleteApp} onEdit={setAppModal} onNotes={app => setNoteModal(app)} />)}</div>
               </div>
             )}
 
@@ -582,13 +1047,23 @@
 
             {tab === "calendar" && (
               <div className="fade-in">
-                <CalendarView events={events} onAddEvent={()=>setEventModal(true)} onDeleteEvent={deleteEvent} />
+                <CalendarView events={events} onAddEvent={()=>setEventModal("new")} onDeleteEvent={deleteEvent} onEditEvent={e => setEventModal(e)} />
               </div>
+            )}
+
+            {tab === "resume" && (
+              <ResumeTab resumes={resumes} onUpload={uploadResume} onDeleteResume={deleteResume} />
+            )}
+
+            {tab === "notes" && (
+              <InterviewNotesView notes={notes} apps={apps} onSaveNote={saveNote} onDeleteNote={deleteNote} />
             )}
           </div>
 
           {appModal && <AppModal initial={appModal==="new"?null:appModal} onSave={saveApp} onClose={()=>setAppModal(null)} />}
-          {eventModal && <EventModal onSave={addEvent} onClose={()=>setEventModal(false)} />}
+          {eventModal && <EventModal initial={eventModal==="new"?null:eventModal} onSave={saveEvent} onClose={()=>setEventModal(null)} />}
+          {noteModal && noteModal !== true && <NoteModal initial={noteModal.company ? { company: noteModal.company, appId: noteModal.id } : null} apps={apps} onSave={saveNote} onClose={()=>setNoteModal(null)} />}
+          {noteModal === true && <NoteModal initial={null} apps={apps} onSave={saveNote} onClose={()=>setNoteModal(null)} />}
         </div>
       );
     }
